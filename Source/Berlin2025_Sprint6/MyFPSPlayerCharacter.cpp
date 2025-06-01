@@ -63,8 +63,6 @@ AMyFPSPlayerCharacter::AMyFPSPlayerCharacter()
 
 	DropDistance = 100.0f; 
 	DropImpulseStrength = 0.0f;
-	FusionRecipeHUDWidgetClass = nullptr;
-	FusionRecipeHUDInstance = nullptr;
 	ToggleRecipesHUDInputAction = nullptr;
 	bCanSeeHiddenPlatforms = false;
 }
@@ -132,45 +130,50 @@ void AMyFPSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 		// }
 	}
 }
+
+// Mise à jour de la fonction HandleToggleRecipesHUD dans MyFPSPlayerCharacter.cpp
+
 void AMyFPSPlayerCharacter::HandleToggleRecipesHUD(const FInputActionValue& Value)
 {
-	if (!FusionRecipeHUDWidgetClass)
+	if (!RecipeManagerHUDWidgetClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AMyFPSPlayerCharacter (%s): FusionRecipeHUDWidgetClass non assigné !"), *GetName());
+		UE_LOG(LogTemp, Warning, TEXT("AMyFPSPlayerCharacter (%s): RecipeManagerHUDWidgetClass non assigné !"), *GetName());
 		return;
 	}
 
 	APlayerController* PlayerController = Cast<APlayerController>(GetController());
 	if (!PlayerController) return;
 
-	if (FusionRecipeHUDInstance && FusionRecipeHUDInstance->IsVisible())
+	if (RecipeManagerHUDInstance && RecipeManagerHUDInstance->IsVisible())
 	{
-		FusionRecipeHUDInstance->RemoveFromParent(); // Ou SetVisibility(ESlateVisibility::Collapsed);
-		// Restaurer le mode d'input du jeu et cacher la souris
-		FInputModeGameOnly GameInputMode;
-		PlayerController->SetInputMode(GameInputMode);
-		PlayerController->SetShowMouseCursor(false);
+		RecipeManagerHUDInstance->RemoveFromParent();
+		UE_LOG(LogTemp, Log, TEXT("HUD des recettes fermé"));
 	}
 	else
 	{
-		if (!FusionRecipeHUDInstance) // Créer si la première fois
+		if (!RecipeManagerHUDInstance)
 		{
-			FusionRecipeHUDInstance = CreateWidget<UMyFusionRecipeHUD>(PlayerController, FusionRecipeHUDWidgetClass);
+			RecipeManagerHUDInstance = CreateWidget<UMyRecipeManagerHUD>(PlayerController, RecipeManagerHUDWidgetClass);
 		}
 
-		if (FusionRecipeHUDInstance)
+		if (RecipeManagerHUDInstance)
 		{
-			FusionRecipeHUDInstance->RefreshRecipeDisplay(); // Mettre à jour les données avant d'afficher
-			FusionRecipeHUDInstance->AddToViewport();
-			// Changer le mode d'input pour UI et montrer la souris
-			FInputModeGameAndUI UIInputMode;
-			UIInputMode.SetWidgetToFocus(FusionRecipeHUDInstance->TakeWidget()); // Donner le focus au widget
-			UIInputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-			PlayerController->SetInputMode(UIInputMode);
-			PlayerController->SetShowMouseCursor(true);
+			RecipeManagerHUDInstance->AddToViewport();
+			UE_LOG(LogTemp, Log, TEXT("HUD des recettes ouvert"));
 		}
 	}
 }
+
+void AMyFPSPlayerCharacter::RefreshRecipeHUD()
+{
+	if (RecipeManagerHUDInstance && RecipeManagerHUDInstance->IsVisible())
+	{
+		RecipeManagerHUDInstance->RefreshAllRecipes();
+	}
+}
+
+// Appeler RefreshRecipeHUD() dans PickupCrystal et DropCrystalFromHand pour mettre à jour automatiquement l'affichage
+
 void AMyFPSPlayerCharacter::PerformLineTrace() //
 {
 	FVector StartLocation = FirstPersonCameraComponent->GetComponentLocation(); //

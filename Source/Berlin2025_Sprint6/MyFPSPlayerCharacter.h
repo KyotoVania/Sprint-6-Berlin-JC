@@ -7,6 +7,7 @@
 #include "InputActionValue.h"      // Nécessaire pour Enhanced Input
 #include "Engine/DataTable.h" // Pour UDataTable
 #include "FusionRecipe.h"
+#include "MyRecipeManagerHUD.h"
 #include "MyFusionRecipeHUD.h" // Pour le HUD des recettes de fusion
 
 #include "MyFPSPlayerCharacter.generated.h"
@@ -105,11 +106,18 @@ protected:
 	void HandleInteractLeftHand(const FInputActionValue& Value);
 	void HandleFuseCrystals(const FInputActionValue& Value);
 
-	UPROPERTY(EditDefaultsOnly, Category = "UI", meta = (ToolTip = "Classe du Widget Blueprint pour le HUD des recettes de fusion."))
-	TSubclassOf<UMyFusionRecipeHUD> FusionRecipeHUDWidgetClass;
+	// Ajout à MyFPSPlayerCharacter.h
+
+	// Remplacer l'ancienne déclaration de FusionRecipeHUD par :
+	UPROPERTY(EditDefaultsOnly, Category = "UI", meta = (ToolTip = "Classe du Widget Blueprint pour le HUD manager des recettes."))
+	TSubclassOf<UMyRecipeManagerHUD> RecipeManagerHUDWidgetClass;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
-	TObjectPtr<UMyFusionRecipeHUD> FusionRecipeHUDInstance;
+	TObjectPtr<UMyRecipeManagerHUD> RecipeManagerHUDInstance;
+
+	// Nouvelle fonction pour rafraîchir les recettes (appelée quand l'inventaire change)
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void RefreshRecipeHUD();
 
 	// Input Action pour afficher/cacher le HUD des recettes
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
