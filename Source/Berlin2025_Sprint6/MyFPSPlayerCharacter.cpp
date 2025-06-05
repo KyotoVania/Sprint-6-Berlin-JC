@@ -222,6 +222,7 @@ bool AMyFPSPlayerCharacter::PickupCrystalToHand(AMyItemCrystal* CrystalToPickup,
 	}
 
 	HandCrystalVariable = CrystalToPickup;
+	HandCrystalVariable->MarkAsPickedUpByPlayer();
 
 	// Désactiver la physique et la collision du cristal ramassé
 	if (HandCrystalVariable->SM_Shape) //
@@ -254,8 +255,8 @@ bool AMyFPSPlayerCharacter::PickupCrystalToHand(AMyItemCrystal* CrystalToPickup,
 	HandCrystalVariable->SetActorRelativeRotation(FRotator::ZeroRotator);
 	if(HandCrystalVariable->SM_Shape) HandCrystalVariable->SM_Shape->SetRelativeRotation(FRotator::ZeroRotator); //
 
-	// Assurez-vous que l'outline est désactivé car il est maintenant tenu
-    HandCrystalVariable->DisableOutline(); //
+    HandCrystalVariable->DisableOutline(); 
+	RefreshRecipeHUD();
 
 
 	UE_LOG(LogTemp, Log, TEXT("Joueur a ramassé %s dans une main."), *HandCrystalVariable->GetName());
@@ -351,22 +352,21 @@ void AMyFPSPlayerCharacter::DropCrystalIntoWorld(AMyItemCrystal* CrystalToDrop)
             CrystalToDrop->SM_Shape->AddImpulse(CameraForward * DropImpulseStrength, NAME_None, true); //
         }
     }
-    // Réactiver la rotation et la flottaison si souhaité quand l'objet est au sol
-    if (CrystalToDrop->RotatingMovementComponent) //
+	if (CrystalToDrop->ShouldHaveActiveTimeline())
 	{
-		CrystalToDrop->RotatingMovementComponent->Activate(true);
-	}
-	if (CrystalToDrop->CrystalTimeline && CrystalToDrop->FloatationCurve) //
-	{
-        // S'assurer que SM_Shape a sa position Z relative correcte avant de redémarrer la flottaison
-        if(CrystalToDrop->SM_Shape) //
-        {
-            // FVector RelativeLoc = CrystalToDrop->SM_Shape->GetRelativeLocation();
-            // RelativeLoc.Z = 0; // Ou la valeur de base stockée dans InitialRelativeLocation de AMyItemCrystal
-            // CrystalToDrop->SM_Shape->SetRelativeLocation(RelativeLoc);
-            // NOTE: InitialRelativeLocation doit être correctement initialisée dans AMyItemCrystal::BeginPlay et utilisée ici.
-        }
-		CrystalToDrop->CrystalTimeline->PlayFromStart();
+		if (CrystalToDrop->RotatingMovementComponent)
+		{
+			CrystalToDrop->RotatingMovementComponent->Activate(true);
+		}
+		if (CrystalToDrop->CrystalTimeline && CrystalToDrop->FloatationCurve)
+		{
+			if(CrystalToDrop->SM_Shape)
+			{
+				// Remettre à la position initiale avant de redémarrer
+				CrystalToDrop->SM_Shape->SetRelativeLocation(CrystalToDrop->InitialRelativeLocation);
+			}
+			CrystalToDrop->CrystalTimeline->PlayFromStart();
+		}
 	}
     CrystalToDrop->DisableOutline(); //
 

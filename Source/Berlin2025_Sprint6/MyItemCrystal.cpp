@@ -20,6 +20,7 @@ AMyItemCrystal::AMyItemCrystal()
 {
     PrimaryActorTick.bCanEverTick = true; 
 	PotentialSkillToGrant = ESkillType::None;
+	bHasBeenPickedUpByPlayer = false;
 
     PointLightComponent = CreateDefaultSubobject<UPointLightComponent>(TEXT("PointLight"));
     PointLightComponent->SetupAttachment(SM_Shape);
@@ -37,7 +38,7 @@ AMyItemCrystal::AMyItemCrystal()
     CrystalPropertiesTable = nullptr;
     FloatationCurve = nullptr;
     LoadedCrystalSFX = nullptr;
-    AmbienceSoundAttenuation = nullptr;  // Sera configuré dans l'éditeur ou par code
+    AmbienceSoundAttenuation = nullptr;  
     CurrentAmbienceAudioComponent = nullptr;
 }
 
@@ -286,4 +287,23 @@ void AMyItemCrystal::Interact_Implementation(AActor* InteractorActor)
     {
        UE_LOG(LogTemp, Warning, TEXT("Interact_Implementation on AMyItemCrystal called by a non-AMyFPSPlayerCharacter actor: %s"), *GetNameSafe(InteractorActor));
     }
+	
+}
+
+bool AMyItemCrystal::ShouldHaveActiveTimeline() const
+{
+	// Si le cristal n'a jamais été pris par le joueur, la timeline peut être active
+	if (!bHasBeenPickedUpByPlayer)
+	{
+		return true;
+	}
+    
+	// Si le cristal a été pris, la timeline ne doit être active que s'il est sur un piédestal
+	AActor* ParentActor = GetAttachParentActor();
+	if (ParentActor && Cast<AMyItemCrystalPedestal>(ParentActor))
+	{
+		return true;
+	}
+    
+	return false;
 }

@@ -172,20 +172,17 @@ bool AMyItemCrystalPedestal::TryPlaceCrystal(AMyItemCrystal* CrystalToPlace)
 	{
 		CrystalToPlace->RotatingMovementComponent->Deactivate();
 	}
-	if (CrystalToPlace->CrystalTimeline) // Supposant que CrystalTimeline contrôle la flottaison
+	if (CrystalToPlace->CrystalTimeline)
 	{
 		CrystalToPlace->CrystalTimeline->Stop();
-        // Optionnel: remettre le cristal à sa position Z relative initiale par rapport à son root si la flottaison l'avait modifié
         if(CrystalToPlace->SM_Shape)
         {
             FVector RelativeLoc = CrystalToPlace->SM_Shape->GetRelativeLocation();
-            RelativeLoc.Z = 0; // Ou une valeur de base si ce n'est pas zéro
+            RelativeLoc.Z = 0; 
             CrystalToPlace->SM_Shape->SetRelativeLocation(RelativeLoc);
         }
 	}
-    // L'outline doit être désactivé si le joueur ne le regarde plus directement.
-    // La fonction StopLookAtInteractable du joueur devrait s'en charger si le joueur détourne le regard.
-    // On peut aussi forcer la désactivation de l'outline du cristal ici.
+  
     CrystalToPlace->DisableOutline();
 
 
@@ -238,10 +235,6 @@ void AMyItemCrystalPedestal::HandleCrystalPlaced(AMyItemCrystal* PlacedCrystal) 
             if (PlayerCharacter)
             {
                 PlayerCharacter->UnlockSkill(PlacedCrystal->PotentialSkillToGrant);
-
-                // Optionnel : le cristal "utilise" sa capacité à donner une compétence une fois.
-                // PlacedCrystal->PotentialSkillToGrant = ESkillType::None; 
-                // Cela empêcherait de redébloquer la même compétence en reprenant et replaçant le même cristal.
             }
             else
             {
@@ -260,10 +253,10 @@ void AMyItemCrystalPedestal::HandleCrystalPlaced(AMyItemCrystal* PlacedCrystal) 
 }	
 void AMyItemCrystalPedestal::HandleCrystalRemoved()
 {
-	bIsCorrectCrystalOnPedestal = false; // Il n'y a plus de cristal, donc il n'est plus correct.
+	bIsCorrectCrystalOnPedestal = false; 
 	UpdatePedestalVisuals();
 
-	if (DeactivationVFX) // Jouer un VFX si un cristal est retiré (qu'il ait été correct ou non)
+	if (DeactivationVFX) 
 	{
 		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), DeactivationVFX, CrystalAttachmentPointComponent->GetComponentLocation(), CrystalAttachmentPointComponent->GetComponentRotation());
 	}
@@ -293,19 +286,3 @@ void AMyItemCrystalPedestal::UpdatePedestalVisuals()
 		}
 	}
 }
-
-// Vous pouvez surcharger StartLookAtInteractable_Implementation et StopLookAtInteractable_Implementation
-// ici si vous voulez un comportement d'outline différent de celui de AMyMasterItem pour le piédestal.
-// Par exemple, ne pas montrer d'outline si un cristal est déjà dessus.
-/*
-void AMyItemCrystalPedestal::StartLookAtInteractable_Implementation()
-{
-	if (bIsCrystalPlaced) return; // Ne pas montrer d'outline si déjà occupé
-	Super::StartLookAtInteractable_Implementation();
-}
-
-void AMyItemCrystalPedestal::StopLookAtInteractable_Implementation()
-{
-	Super::StopLookAtInteractable_Implementation();
-}
-*/

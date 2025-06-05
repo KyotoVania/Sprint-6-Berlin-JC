@@ -72,7 +72,6 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Crystal Properties")
 	ESkillType PotentialSkillToGrant;
 
-	// Nouvelles fonctions publiques pour contrôler l'ambiance
 	UFUNCTION(BlueprintCallable, Category = "Crystal Audio")
 	void StartAmbienceSound();
 	
@@ -81,12 +80,19 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Crystal Audio")
 	bool IsAmbienceSoundPlaying() const;
+	UPROPERTY()
+	bool bHasBeenPickedUpByPlayer;
+	UFUNCTION(BlueprintCallable, Category = "Crystal State")
+	void MarkAsPickedUpByPlayer() { bHasBeenPickedUpByPlayer = true; }
+    
+	UFUNCTION(BlueprintCallable, Category = "Crystal State")
+	bool ShouldHaveActiveTimeline() const;
+	FVector InitialRelativeLocation;
 
 private:
 	void InitializeFloatationTimeline();
 	bool ShouldPlayAmbienceSound() const;
 
-	FVector InitialRelativeLocation;
 
 	// Nouveau: Référence vers l'instance du son d'ambiance en cours
 	UPROPERTY()
