@@ -5,7 +5,7 @@
 #include "MyMasterItem.h"
 #include "CrystalType.h"
 #include "SkillType.h"
-#include "CrystalProperties.h" // Inclure notre nouvelle structure
+#include "CrystalProperties.h"
 #include "MyItemCrystal.generated.h"
 
 // Forward declarations
@@ -16,9 +16,8 @@ class UTimelineComponent;
 class USoundBase;
 class UDataTable;
 class UCurveFloat;
-class UAudioComponent;     // << AJOUTÉ forward declaration
-class USphereComponent;    // << AJOUTÉ forward declaration
-class AMyFPSPlayerCharacter; // Déjà présent, bien
+class USoundAttenuation;  // Nouveau: pour les paramètres d'atténuation
+class AMyFPSPlayerCharacter;
 
 UCLASS(Blueprintable, BlueprintType)
 class BERLIN2025_SPRINT6_API AMyItemCrystal : public AMyMasterItem
@@ -31,6 +30,7 @@ public:
 	virtual void Interact_Implementation(AActor* InteractorActor) override;
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override; // Nouveau: pour nettoyer le son
 
 	// ----- Composants -----
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
@@ -45,12 +45,6 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UTimelineComponent> CrystalTimeline;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components|Audio", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UAudioComponent> AmbienceAudioComponent;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components|Audio", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<USphereComponent> AmbienceTriggerSphere;
-
 	// ----- Configuration du Cristal -----
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Crystal Config")
 	ECrystalType CrystalType;
@@ -58,15 +52,16 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Crystal Config")
 	TObjectPtr<UDataTable> CrystalPropertiesTable;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Crystal Config|Audio", meta = (ToolTip = "Rayon de la sphère pour déclencher le son d'ambiance (LoadedCrystalSFX)."))
-    float AmbienceSoundRadius;
+	// Nouveau: Paramètres d'atténuation pour le son d'ambiance
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Crystal Config|Audio", meta = (ToolTip = "Paramètres d'atténuation pour le son d'ambiance du cristal."))
+	TObjectPtr<USoundAttenuation> AmbienceSoundAttenuation;
 
 	// ----- Flottaison -----
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Crystal Config|Floatation")
 	TObjectPtr<UCurveFloat> FloatationCurve;
 
 	// Fonction appelée par le Timeline pour la flottaison
-	UFUNCTION() // Déjà UFUNCTION, bien
+	UFUNCTION()
 	void TimelineUpdate_Floatation(float Value);
 
 	// Son chargé depuis la DataTable (utilisé pour l'ambiance et potentiellement interaction)
@@ -76,19 +71,26 @@ public:
 	
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Crystal Properties")
 	ESkillType PotentialSkillToGrant;
+
+	// Nouvelles fonctions publiques pour contrôler l'ambiance
+	UFUNCTION(BlueprintCallable, Category = "Crystal Audio")
+	void StartAmbienceSound();
+	
+	UFUNCTION(BlueprintCallable, Category = "Crystal Audio")
+	void StopAmbienceSound();
+
+	UFUNCTION(BlueprintCallable, Category = "Crystal Audio")
+	bool IsAmbienceSoundPlaying() const;
+
 private:
 	void InitializeFloatationTimeline();
-	void InitializeAmbienceSystem(); // CORRIGÉ: Nom correspond à l'implémentation
 	bool ShouldPlayAmbienceSound() const;
 
 	FVector InitialRelativeLocation;
 
-    // Fonctions pour gérer l'overlap - DOIVENT ÊTRE UFUNCTION()
-	UFUNCTION()
-	void OnAmbienceSphereBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
-
-	UFUNCTION()
-	void OnAmbienceSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+	// Nouveau: Référence vers l'instance du son d'ambiance en cours
+	UPROPERTY()
+	class UAudioComponent* CurrentAmbienceAudioComponent;
 
 public:
 	UFUNCTION(BlueprintPure, Category = "Crystal Properties")

@@ -1,10 +1,9 @@
 ﻿// MyItemCrystal.cpp
 #include "MyItemCrystal.h"
 
-#include "MyFPSPlayerCharacter.h" // Bien pour le Cast
+#include "MyFPSPlayerCharacter.h"
 #include "MyItemCrystalPedestal.h"
 #include "Components/PointLightComponent.h"
-#include "Components/SphereComponent.h"   // Bien pour AmbienceTriggerSphere
 #include "Particles/ParticleSystemComponent.h"
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/TimelineComponent.h"
@@ -12,7 +11,8 @@
 #include "Engine/DataTable.h"
 #include "Curves/CurveFloat.h"
 #include "Sound/SoundBase.h"
-#include "Components/AudioComponent.h" // Assurez-vous que cet include est présent ! Il manquait dans votre extrait.
+#include "Sound/SoundAttenuation.h"  // Nouveau
+#include "Components/AudioComponent.h"
 #include "UObject/ConstructorHelpers.h" 
 #include "Kismet/GameplayStatics.h"
 
@@ -21,28 +21,14 @@ AMyItemCrystal::AMyItemCrystal()
     PrimaryActorTick.bCanEverTick = true; 
 	PotentialSkillToGrant = ESkillType::None;
 
-    // SM_Shape est créé dans AMyMasterItem, donc pas besoin de le recréer ici.
-    // S'assurer qu'il est bien le composant racine par défaut ou attaché correctement.
-    // Dans AMyMasterItem, RootComponent = DefaultSceneRoot, et SM_Shape est attaché à DefaultSceneRoot. C'est OK.
-
     PointLightComponent = CreateDefaultSubobject<UPointLightComponent>(TEXT("PointLight"));
-    PointLightComponent->SetupAttachment(SM_Shape); // Attacher au mesh visible
+    PointLightComponent->SetupAttachment(SM_Shape);
 
     CrystalVFXComponent = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("CrystalVFX"));
-    CrystalVFXComponent->SetupAttachment(SM_Shape); // Attacher au mesh visible
+    CrystalVFXComponent->SetupAttachment(SM_Shape);
 
     RotatingMovementComponent = CreateDefaultSubobject<URotatingMovementComponent>(TEXT("RotatingMovement"));
-    RotatingMovementComponent->UpdatedComponent = SM_Shape; // Le SM_Shape est celui qui tourne
-
-    // Les composants pour l'ambiance
-    AmbienceAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("AmbienceAudio"));
-    AmbienceAudioComponent->SetupAttachment(RootComponent); // Attaché à la racine de l'acteur
-    AmbienceAudioComponent->bAutoActivate = false; 
-
-    AmbienceTriggerSphere = CreateDefaultSubobject<USphereComponent>(TEXT("AmbienceTriggerSphere"));
-    AmbienceTriggerSphere->SetupAttachment(RootComponent); // Attaché à la racine de l'acteur
-    AmbienceTriggerSphere->SetCollisionProfileName(TEXT("Trigger")); // Pour les overlaps
-    AmbienceTriggerSphere->SetSphereRadius(500.0f); // Valeur par défaut, sera ajustée par AmbienceSoundRadius
+    RotatingMovementComponent->UpdatedComponent = SM_Shape;
 
     CrystalTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("CrystalTimeline"));
 
@@ -50,33 +36,61 @@ AMyItemCrystal::AMyItemCrystal()
     CrystalType = ECrystalType::Joy; 
     CrystalPropertiesTable = nullptr;
     FloatationCurve = nullptr;
-    LoadedCrystalSFX = nullptr; // Sera chargé par SetupCrystalFromDataTable
-    AmbienceSoundRadius = 500.0f; 
+    LoadedCrystalSFX = nullptr;
+    AmbienceSoundAttenuation = nullptr;  // Sera configuré dans l'éditeur ou par code
+    CurrentAmbienceAudioComponent = nullptr;
 }
 
 void AMyItemCrystal::BeginPlay()
 {
     Super::BeginPlay();
 
-    SetupCrystalFromDataTable();    // Doit être appelé avant InitializeAmbienceSystem si ce dernier utilise LoadedCrystalSFX
+    SetupCrystalFromDataTable();
     InitializeFloatationTimeline();
-    InitializeAmbienceSystem();     // Configure l'AudioComponent et les overlaps
 
-    if (SM_Shape) // SM_Shape est le composant mesh principal
+    if (SM_Shape)
     {
         InitialRelativeLocation = SM_Shape->GetRelativeLocation();
     }
     
-    // Appliquer le rayon configuré si AmbienceTriggerSphere est valide
-    if (AmbienceTriggerSphere) { 
-       AmbienceTriggerSphere->SetSphereRadius(AmbienceSoundRadius);
+    // Démarrer automatiquement le son d'ambiance si les conditions sont remplies
+    if (ShouldPlayAmbienceSound())
+    {
+        StartAmbienceSound();
     }
+}
+
+void AMyItemCrystal::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    // Nettoyer le son d'ambiance lors de la destruction
+    StopAmbienceSound();
+    Super::EndPlay(EndPlayReason);
 }
 
 void AMyItemCrystal::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-    // Le TimelineComponent gère son propre Tick.
+    
+    // Vérifier périodiquement si les conditions pour jouer le son ont changé
+    static float LastSoundCheck = 0.0f;
+    LastSoundCheck += DeltaTime;
+    
+    if (LastSoundCheck >= 0.5f) // Vérifier toutes les 0.5 secondes
+    {
+        LastSoundCheck = 0.0f;
+        
+        bool ShouldPlay = ShouldPlayAmbienceSound();
+        bool IsCurrentlyPlaying = IsAmbienceSoundPlaying();
+        
+        if (ShouldPlay && !IsCurrentlyPlaying)
+        {
+            StartAmbienceSound();
+        }
+        else if (!ShouldPlay && IsCurrentlyPlaying)
+        {
+            StopAmbienceSound();
+        }
+    }
 }
 
 void AMyItemCrystal::SetupCrystalFromDataTable()
@@ -132,7 +146,7 @@ void AMyItemCrystal::SetupCrystalFromDataTable()
        CrystalVFXComponent->ActivateSystem(true);
     }
 
-    LoadedCrystalSFX = FoundRowData->CrystalSFX; // C'est ce son qui sera utilisé pour l'ambiance
+    LoadedCrystalSFX = FoundRowData->CrystalSFX;
 }
 
 void AMyItemCrystal::InitializeFloatationTimeline()
@@ -165,26 +179,6 @@ void AMyItemCrystal::TimelineUpdate_Floatation(float Value)
     }
 }
 
-void AMyItemCrystal::InitializeAmbienceSystem()
-{
-    if (LoadedCrystalSFX && AmbienceAudioComponent)
-    {
-       AmbienceAudioComponent->SetSound(LoadedCrystalSFX);
-       
-    }
-    else
-    {
-       if (!LoadedCrystalSFX) UE_LOG(LogTemp, Warning, TEXT("AMyItemCrystal %s: LoadedCrystalSFX (pour ambiance) est null. Vérifiez la DataTable et l'assignation."), *GetNameSafe(this));
-       if (!AmbienceAudioComponent) UE_LOG(LogTemp, Warning, TEXT("AMyItemCrystal %s: AmbienceAudioComponent est null."), *GetNameSafe(this));
-    }
-
-    if (AmbienceTriggerSphere)
-    {
-       AmbienceTriggerSphere->OnComponentBeginOverlap.AddDynamic(this, &AMyItemCrystal::OnAmbienceSphereBeginOverlap);
-       AmbienceTriggerSphere->OnComponentEndOverlap.AddDynamic(this, &AMyItemCrystal::OnAmbienceSphereEndOverlap);
-       AmbienceTriggerSphere->SetSphereRadius(AmbienceSoundRadius); // S'assurer que le rayon est appliqué
-    }
-}
 bool AMyItemCrystal::ShouldPlayAmbienceSound() const
 {
 	AActor* ParentActor = GetAttachParentActor();
@@ -198,72 +192,88 @@ bool AMyItemCrystal::ShouldPlayAmbienceSound() const
 		// Si attaché à autre chose (comme le joueur), le son peut jouer.
 	}
 	// Si pas attaché (au sol), le son peut jouer.
-	// La condition IsSimulatingPhysics() est retirée ici pour permettre au son de jouer même si droppé et en mouvement.
-	// Le son sera géré par l'entrée/sortie de la sphère du joueur.
 	return true;
 }
 
-void AMyItemCrystal::OnAmbienceSphereBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void AMyItemCrystal::StartAmbienceSound()
 {
-	AMyFPSPlayerCharacter* PlayerCharacter = Cast<AMyFPSPlayerCharacter>(OtherActor);
-	if (PlayerCharacter && AmbienceAudioComponent && LoadedCrystalSFX)
-	{
-		if (ShouldPlayAmbienceSound()) // Utilisation de la nouvelle fonction helper
-		{
-			if (!AmbienceAudioComponent->IsPlaying())
-			{
-				AmbienceAudioComponent->Play();
-				UE_LOG(LogTemp, Log, TEXT("Cristal %s: Son d'ambiance DÉMARRÉ (overlap & conditions remplies) pour %s"), *GetNameSafe(this), *GetNameSafe(OtherActor));
-			}
-		}
-		else
-		{
-			// Si les conditions ne sont pas remplies (ex: sur un piédestal) et qu'il jouait, on l'arrête.
-			if (AmbienceAudioComponent->IsPlaying())
-			{
-				AmbienceAudioComponent->Stop();
-				UE_LOG(LogTemp, Log, TEXT("Cristal %s: Son d'ambiance ARRÊTÉ (conditions non remplies à l'overlap) pour %s"), *GetNameSafe(this), *GetNameSafe(OtherActor));
-			}
-		}
-	}
-}
-void AMyItemCrystal::OnAmbienceSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
-{
-    AMyFPSPlayerCharacter* PlayerCharacter = Cast<AMyFPSPlayerCharacter>(OtherActor);
-    if (PlayerCharacter && AmbienceAudioComponent && AmbienceAudioComponent->IsPlaying())
+    if (!LoadedCrystalSFX)
     {
-        AmbienceAudioComponent->Stop(); // Ou FadeOut(0.5f, 0.0f); pour une transition douce
-        UE_LOG(LogTemp, Log, TEXT("Cristal %s: Son d'ambiance (LoadedCrystalSFX) arrêté pour %s"), *GetNameSafe(this), *GetNameSafe(OtherActor));
+        UE_LOG(LogTemp, Warning, TEXT("AMyItemCrystal %s: Impossible de démarrer le son d'ambiance - LoadedCrystalSFX est null"), *GetNameSafe(this));
+        return;
+    }
+
+    // Arrêter le son existant s'il y en a un
+    StopAmbienceSound();
+
+    // Utiliser SpawnSoundAttached pour créer le son avec atténuation
+    CurrentAmbienceAudioComponent = UGameplayStatics::SpawnSoundAttached(
+        LoadedCrystalSFX,           // Le son à jouer
+        SM_Shape,                   // Composant auquel attacher le son (le mesh du cristal)
+        NAME_None,                  // Pas de socket spécifique
+        FVector::ZeroVector,        // Pas d'offset de location
+        FRotator::ZeroRotator,      // Pas d'offset de rotation
+        EAttachLocation::KeepRelativeOffset,  // Type d'attachement
+        true,                       // bStopWhenAttachedToDestroyed
+        1.0f,                       // VolumeMultiplier
+        1.0f,                       // PitchMultiplier
+        0.0f,                       // StartTime
+        AmbienceSoundAttenuation,   // Paramètres d'atténuation
+        nullptr,                    // Pas de concurrency settings
+        false                       // bAutoDestroy - false pour pouvoir contrôler l'arrêt
+    );
+
+    if (CurrentAmbienceAudioComponent)
+    {
+        // Configurer pour jouer en boucle
+        CurrentAmbienceAudioComponent->SetIntParameter(FName("Loop"), 1);
+        UE_LOG(LogTemp, Log, TEXT("Cristal %s: Son d'ambiance démarré avec SpawnSoundAttached"), *GetNameSafe(this));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Cristal %s: Échec du démarrage du son d'ambiance avec SpawnSoundAttached"), *GetNameSafe(this));
     }
 }
-    void AMyItemCrystal::Interact_Implementation(AActor* InteractorActor)
+
+void AMyItemCrystal::StopAmbienceSound()
+{
+    if (CurrentAmbienceAudioComponent && IsValid(CurrentAmbienceAudioComponent))
+    {
+        CurrentAmbienceAudioComponent->Stop();
+        CurrentAmbienceAudioComponent = nullptr;
+        UE_LOG(LogTemp, Log, TEXT("Cristal %s: Son d'ambiance arrêté"), *GetNameSafe(this));
+    }
+}
+
+bool AMyItemCrystal::IsAmbienceSoundPlaying() const
+{
+    return CurrentAmbienceAudioComponent && IsValid(CurrentAmbienceAudioComponent) && CurrentAmbienceAudioComponent->IsPlaying();
+}
+
+void AMyItemCrystal::Interact_Implementation(AActor* InteractorActor)
 {
     UE_LOG(LogTemp, Log, TEXT("Crystal %s interacted with by %s"), *GetNameSafe(this), *GetNameSafe(InteractorActor));
 
     AMyFPSPlayerCharacter* PlayerCharacter = Cast<AMyFPSPlayerCharacter>(InteractorActor);
     if (PlayerCharacter)
     {
-       // Vérifie si le joueur a au moins une main de libre pour ramasser ce cristal
-       if (!PlayerCharacter->GetRightHandCrystal() || !PlayerCharacter->GetLeftHandCrystal()) //
+       if (!PlayerCharacter->GetRightHandCrystal() || !PlayerCharacter->GetLeftHandCrystal())
        {
-          // PlayerCharacter->PickupCrystal va tenter de le mettre dans la main droite, puis la gauche.
-          if (PlayerCharacter->PickupCrystal(this)) //
+          if (PlayerCharacter->PickupCrystal(this))
           {
              UE_LOG(LogTemp, Log, TEXT("Player %s picked up crystal %s"), *GetNameSafe(PlayerCharacter), *GetNameSafe(this));
-             DisableOutline(); //
+             DisableOutline();
+             // Le son continuera automatiquement car le cristal est maintenant attaché au joueur
           }
           else
           {
-             // Cela pourrait arriver si PickupCrystal a une logique interne qui échoue pour une autre raison,
-             // ou si entre-temps les deux mains se sont remplies (peu probable dans un appel direct comme ici).
              UE_LOG(LogTemp, Warning, TEXT("Player %s failed to pick up crystal %s (PickupCrystal returned false)."), *GetNameSafe(PlayerCharacter), *GetNameSafe(this));
           }
        }
-       else // Les deux mains du joueur sont pleines
+       else
        {
-          // Construction du message pour le log, indiquant ce que tient le joueur
-          FString RightCrystalName = PlayerCharacter->GetRightHandCrystal() ? PlayerCharacter->GetRightHandCrystal()->GetName() : TEXT("Nothing"); //
-          FString LeftCrystalName = PlayerCharacter->GetLeftHandCrystal() ? PlayerCharacter->GetLeftHandCrystal()->GetName() : TEXT("Nothing"); //
+          FString RightCrystalName = PlayerCharacter->GetRightHandCrystal() ? PlayerCharacter->GetRightHandCrystal()->GetName() : TEXT("Nothing");
+          FString LeftCrystalName = PlayerCharacter->GetLeftHandCrystal() ? PlayerCharacter->GetLeftHandCrystal()->GetName() : TEXT("Nothing");
 
           UE_LOG(LogTemp, Log, TEXT("Player %s has both hands full (Right: %s, Left: %s). Cannot pick up %s."), 
              *GetNameSafe(PlayerCharacter), 
