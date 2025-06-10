@@ -175,12 +175,10 @@ bool AMyItemCrystalPedestal::TryPlaceCrystal(AMyItemCrystal* CrystalToPlace)
 	if (CrystalToPlace->CrystalTimeline)
 	{
 		CrystalToPlace->CrystalTimeline->Stop();
-        if(CrystalToPlace->SM_Shape)
-        {
-            FVector RelativeLoc = CrystalToPlace->SM_Shape->GetRelativeLocation();
-            RelativeLoc.Z = 0; 
-            CrystalToPlace->SM_Shape->SetRelativeLocation(RelativeLoc);
-        }
+		if(CrystalToPlace->SM_Shape)
+		{
+			CrystalToPlace->SM_Shape->SetRelativeLocation(FVector::ZeroVector); // Réinitialisation à zéro
+		}
 	}
   
     CrystalToPlace->DisableOutline();
@@ -286,3 +284,4 @@ void AMyItemCrystalPedestal::UpdatePedestalVisuals()
 		}
 	}
 }
+

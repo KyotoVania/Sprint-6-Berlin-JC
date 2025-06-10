@@ -1,5 +1,4 @@
-﻿// MyFPSPlayerCharacter.cpp
-#include "MyFPSPlayerCharacter.h"
+﻿#include "MyFPSPlayerCharacter.h"
 #include "Camera/CameraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SceneComponent.h"
@@ -241,11 +240,7 @@ bool AMyFPSPlayerCharacter::PickupCrystalToHand(AMyItemCrystal* CrystalToPickup,
 		HandCrystalVariable->CrystalTimeline->Stop();
 		if(HandCrystalVariable->SM_Shape)  // // Remettre à Z relatif initial si modifié par flottaison
 		{
-			FVector InitialRelativeLoc = HandCrystalVariable->SM_Shape->GetRelativeLocation();
-            // Ceci suppose que la position de base Z de SM_Shape par rapport à son parent (le root du cristal) est 0
-            // ou une valeur connue. Si InitialRelativeLocation était stockée dans AMyItemCrystal, ce serait mieux.
-			InitialRelativeLoc.Z = 0; 
-			HandCrystalVariable->SM_Shape->SetRelativeLocation(InitialRelativeLoc);
+			HandCrystalVariable->SM_Shape->SetRelativeLocation(FVector::ZeroVector); // Réinitialisation à zéro
 		}
 	}
 
@@ -526,6 +521,11 @@ void AMyFPSPlayerCharacter::HandleFuseCrystals(const FInputActionValue& Value)
             LeftHandCrystal->Destroy();
             RightHandCrystal = nullptr; //
             LeftHandCrystal = nullptr; //
+        	if (CrystalMergeSound)
+        	{
+        		UGameplayStatics::PlaySoundAtLocation(this, CrystalMergeSound, SpawnLocation);
+        	}
+        	
 
             // Créer le nouveau cristal fusionné
             FActorSpawnParameters SpawnParams;
@@ -631,3 +631,4 @@ void AMyFPSPlayerCharacter::UnlockSkill(ESkillType SkillToUnlock)
         UE_LOG(LogTemp, Log, TEXT("AMyFPSPlayerCharacter (%s): Compétence '%s' était déjà débloquée."), *GetName(), *SkillNameAsString);
     }
 }
+

@@ -18,9 +18,7 @@ AMyMasterItem::AMyMasterItem()
 	Decal_Outline = CreateDefaultSubobject<UDecalComponent>(TEXT("Decal_Outline"));
 	Decal_Outline->SetupAttachment(SM_Shape); // Attaché au mesh pour suivre ses transformations
 	Decal_Outline->SetVisibility(false); // Caché par défaut
-
-	// Valeurs par défaut si besoin
-	DecalSize = FVector(10.0f, 128.0f, 128.0f); // Exemple, ajuste selon tes besoins
+	// DecalSize = FVector(10.0f, 128.0f, 128.0f); // Supprimé pour permettre la configuration via Blueprint
 	ShapeScale = FVector(1.0f);
 	bIsOutlineEnabled = false;
 }
@@ -29,7 +27,7 @@ void AMyMasterItem::BeginPlay()
 {
 	Super::BeginPlay();
 	SM_Shape->SetRelativeScale3D(ShapeScale);
-	Decal_Outline->DecalSize = DecalSize;
+	// Decal_Outline->DecalSize = DecalSize; // Supprimé pour éviter l'override
 	// Tu peux aussi définir le matériau du décalque ici si besoin
 	// Decal_Outline->SetDecalMaterial(...);
 }
@@ -71,3 +69,4 @@ void AMyMasterItem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }
+

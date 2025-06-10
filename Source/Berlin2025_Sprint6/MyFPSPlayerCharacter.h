@@ -1,5 +1,4 @@
-﻿// MyFPSPlayerCharacter.h
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
@@ -9,6 +8,7 @@
 #include "FusionRecipe.h"
 #include "MyRecipeManagerHUD.h"
 #include "MyFusionRecipeHUD.h" // Pour le HUD des recettes de fusion
+#include "Sound/SoundBase.h" // Ajout pour l'audio
 
 #include "MyFPSPlayerCharacter.generated.h"
 
@@ -87,6 +87,10 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Skills")
 	bool bCanSeeHiddenPlatforms;
 
+	// --- AUDIO ---
+	/** Effet sonore joué lors de la fusion réussie des cristaux */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Audio")
+	TObjectPtr<USoundBase> CrystalMergeSound;
 
 	// ----- Actions & Input -----
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
